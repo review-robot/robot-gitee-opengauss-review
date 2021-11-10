@@ -26,6 +26,7 @@ go_library(
         "main.go",
         "permission.go",
         "robot.go",
+	"lgtm.go",
     ],
     importpath = "github.com/opensourceways/robot-gitee-opengauss-review",
     visibility = ["//visibility:private"],

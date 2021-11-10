@@ -43,7 +43,7 @@ func (bot *robot) handleLGTM(e *sdk.NoteEvent, cfg *botConfig, log *logrus.Entry
 		return bot.removeLGTM(cfg, ne, log)
 	}
 
-	return nil
+	return bot.removeLGTM(cfg, e, log)
 }
 
 func (bot *robot) addLGTM(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
@@ -59,6 +59,7 @@ func (bot *robot) addLGTM(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus
 	if err != nil {
 		return err
 	}
+
 	if !v {
 		return bot.cli.CreatePRComment(org, repo, number, fmt.Sprintf(
 			commentNoPermissionForLabel, commenter, "add", lgtmLabel,
@@ -84,6 +85,7 @@ func (bot *robot) removeLGTM(cfg *botConfig, e giteeclient.PRNoteEvent, log *log
 		if err != nil {
 			return err
 		}
+
 		if !v {
 			return bot.cli.CreatePRComment(org, repo, number, fmt.Sprintf(
 				commentNoPermissionForLabel, commenter, "remove", lgtmLabel,

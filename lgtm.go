@@ -43,7 +43,7 @@ func (bot *robot) handleLGTM(e *sdk.NoteEvent, cfg *botConfig, log *logrus.Entry
 		return bot.removeLGTM(cfg, ne, log)
 	}
 
-	return bot.removeLGTM(cfg, e, log)
+	return nil
 }
 
 func (bot *robot) addLGTM(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {

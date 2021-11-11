@@ -30,11 +30,6 @@ func newRobot(cli iClient, cacheCli *cache.SDK) *robot {
 	return &robot{cli: cli, cacheCli: cacheCli}
 }
 
-type ownersFile struct {
-	Maintainers []string `yaml:"maintainers"`
-	Committers  []string `yaml:"committers"`
-}
-
 type robot struct {
 	cli      iClient
 	cacheCli *cache.SDK

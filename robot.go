@@ -24,6 +24,11 @@ type iClient interface {
 	GetPullRequestChanges(org, repo string, number int32) ([]sdk.PullRequestFiles, error)
 	CreateRepoLabel(org, repo, label, color string) error
 	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
+	ListPRComments(org, repo string, number int32) ([]sdk.PullRequestComments, error)
+	GetPRCommit(org, repo, SHA string) (sdk.RepoCommit, error)
+	GetGiteePullRequest(org, repo string, number int32) (sdk.PullRequest, error)
+	MergePR(owner, repo string, number int32, opt sdk.PullRequestMergePutParam) error
+	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
 }
 
 func newRobot(cli iClient, cacheCli *cache.SDK) *robot {

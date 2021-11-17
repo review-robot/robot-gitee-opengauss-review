@@ -2,7 +2,8 @@ package main
 
 import (
 	"encoding/base64"
-	"path"
+	"fmt"
+	"path/filepath"
 	"regexp"
 
 	"github.com/opensourceways/community-robot-lib/giteeclient"
@@ -12,13 +13,17 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const ownerFile = "OWNERS"
+
+var reSigsPath = regexp.MustCompile(`^sigs/[-\w]+/`)
+
 func (bot *robot) hasPermission(
 	commenter string,
-	info giteeclient.PRInfo,
+	pr giteeclient.PRInfo,
 	cfg *botConfig,
 	log *logrus.Entry,
 ) (bool, error) {
-	p, err := bot.cli.GetUserPermissionsOfRepo(info.Org, info.Repo, commenter)
+	p, err := bot.cli.GetUserPermissionsOfRepo(pr.Org, pr.Repo, commenter)
 	if err != nil {
 		return false, err
 	}
@@ -27,112 +32,119 @@ func (bot *robot) hasPermission(
 		return true, nil
 	}
 
-	// determine if the commenter is in the OWNERS file of the repository where the event occurred
-	if v, err := bot.inRepoOwnersFile(commenter, info, "OWNERS", log); err != nil || v {
-		return v, err
-	}
-
-	return bot.inSigDirOwnersFile(commenter, info, cfg, log)
-}
-
-func (bot *robot) inRepoOwnersFile(
-	commenter string,
-	info giteeclient.PRInfo,
-	path string,
-	log *logrus.Entry,
-) (bool, error) {
-	content, err := bot.cli.GetPathContent(info.Org, info.Repo, path, info.BaseRef)
-	if err != nil || content.Content == "" {
-		return false, err
-	}
-
-	owners := decodeOwners(content.Content, log)
-
-	return owners.Has(commenter), nil
-}
-
-func (bot *robot) inSigDirOwnersFile(
-	commenter string,
-	info giteeclient.PRInfo,
-	cfg *botConfig,
-	log *logrus.Entry,
-) (bool, error) {
-	if !cfg.isSpecialRepo(info.Repo) {
-		return false, nil
-	}
-
-	cFiles, err := bot.cli.GetPullRequestChanges(info.Org, info.Repo, info.Number)
+	v, err := bot.getRepoOwners(pr, log)
 	if err != nil {
 		return false, err
 	}
-
-	regSigFilePattern := regexp.MustCompile("^sigs/[a-zA-Z0-9_-]+/.+")
-	filesPath := sets.NewString()
-
-	for _, file := range cFiles {
-		if !regSigFilePattern.MatchString(file.Filename) {
-			return false, nil
-		}
-
-		filesPath.Insert(path.Dir(file.Filename))
+	if v.Has(commenter) {
+		return true, nil
 	}
 
-	if len(filesPath) == 0 {
-		return false, nil
+	if len(cfg.ReposOfSig) > 0 {
+		v = sets.NewString(cfg.ReposOfSig...)
+		if v.Has(fmt.Sprintf("%s/%s", pr.Org, pr.Repo)) {
+			return bot.isOwnerOfSig(commenter, pr, cfg, log)
+		}
+	}
+
+	return false, nil
+}
+
+func (bot *robot) getRepoOwners(pr giteeclient.PRInfo, log *logrus.Entry) (sets.String, error) {
+	v, err := bot.cli.GetPathContent(pr.Org, pr.Repo, ownerFile, pr.BaseRef)
+	if err != nil || v.Content == "" {
+		return nil, err
+	}
+
+	return decodeOwnerFile(v.Content, log), nil
+}
+
+func (bot *robot) isOwnerOfSig(
+	commenter string,
+	pr giteeclient.PRInfo,
+	cfg *botConfig,
+	log *logrus.Entry,
+) (bool, error) {
+	changes, err := bot.cli.GetPullRequestChanges(pr.Org, pr.Repo, pr.Number)
+	if err != nil || len(changes) == 0 {
+		return false, err
+	}
+
+	pathes := sets.NewString()
+	for _, file := range changes {
+		if !reSigsPath.MatchString(file.Filename) {
+			return false, nil
+		}
+		pathes.Insert(filepath.Dir(file.Filename))
 	}
 
 	param := models.Branch{
 		Platform: "gitee",
-		Org:      info.Org,
-		Repo:     info.Repo,
-		Branch:   info.BaseRef,
+		Org:      pr.Org,
+		Repo:     pr.Repo,
+		Branch:   pr.BaseRef,
 	}
 
-	files, err := bot.cacheCli.GetFiles(param, "OWNERS", true)
-	if err != nil || len(files.Files) == 0 {
+	files, err := bot.cacheCli.GetFiles(param, ownerFile, true)
+	if err != nil {
 		return false, err
+	}
+	if len(files.Files) == 0 {
+		log.WithFields(
+			logrus.Fields{
+				"org":    pr.Org,
+				"repo":   pr.Repo,
+				"branch": pr.BaseRef,
+			},
+		).Infof("there is not %s file stored in cache.", ownerFile)
+
+		return false, nil
 	}
 
 	for _, v := range files.Files {
-		if !filesPath.Has(string(v.Path)) {
+		p := v.Path.Dir()
+		if !pathes.Has(p) {
 			continue
 		}
 
-		if owners := decodeOwners(v.Content, log); !owners.Has(commenter) {
+		if o := decodeOwnerFile(v.Content, log); !o.Has(commenter) {
 			return false, nil
 		}
 
-		filesPath.Delete(string(v.Path))
-		if len(filesPath) == 0 {
-			break
+		pathes.Delete(p)
+
+		if len(pathes) == 0 {
+			return true, nil
 		}
 	}
 
-	return len(filesPath) == 0, nil
+	return false, nil
 }
 
-func decodeOwners(content string, log *logrus.Entry) sets.String {
+func decodeOwnerFile(content string, log *logrus.Entry) sets.String {
 	owners := sets.NewString()
 
-	decodeBytes, err := base64.StdEncoding.DecodeString(content)
+	c, err := base64.StdEncoding.DecodeString(content)
 	if err != nil {
-		log.Error(err)
+		log.WithError(err).Error("decode file")
 		return owners
 	}
 
-	var oFile ownersFile
-	err = yaml.Unmarshal(decodeBytes, &oFile)
-	if err != nil {
-		log.Error(err)
+	var m struct {
+		Maintainers []string `yaml:"maintainers"`
+		Committers  []string `yaml:"committers"`
+	}
+
+	if err = yaml.Unmarshal(c, &m); err != nil {
+		log.WithError(err).Error("code yaml file")
 		return owners
 	}
 
-	if len(oFile.Maintainers) > 0 {
-		owners.Insert(oFile.Maintainers...)
+	if len(m.Maintainers) > 0 {
+		owners.Insert(m.Maintainers...)
 	}
-	if len(oFile.Committers) > 0 {
-		owners.Insert(oFile.Committers...)
+	if len(m.Committers) > 0 {
+		owners.Insert(m.Committers...)
 	}
-
 	return owners
 }

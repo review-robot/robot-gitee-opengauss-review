@@ -24,6 +24,9 @@ type iClient interface {
 	GetPullRequestChanges(org, repo string, number int32) ([]sdk.PullRequestFiles, error)
 	CreateRepoLabel(org, repo, label, color string) error
 	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
+	GetGiteePullRequest(org, repo string, number int32) (sdk.PullRequest, error)
+	MergePR(owner, repo string, number int32, opt sdk.PullRequestMergePutParam) error
+	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
 }
 
 func newRobot(cli iClient, cacheCli *cache.SDK) *robot {
@@ -57,13 +60,23 @@ func (bot *robot) RegisterEventHandler(p libplugin.HandlerRegitster) {
 	p.RegisterNoteEventHandler(bot.handleNoteEvent)
 }
 
-func (bot *robot) handlePREvent(e *sdk.PullRequestEvent, cfg libconfig.PluginConfig, log *logrus.Entry) error {
+func (bot *robot) handlePREvent(e *sdk.PullRequestEvent, pc libconfig.PluginConfig, log *logrus.Entry) error {
 	org, repo := giteeclient.GetOwnerAndRepoByPREvent(e)
-	if _, err := bot.getConfig(cfg, org, repo); err != nil {
+	cfg, err := bot.getConfig(pc, org, repo)
+	if err != nil {
 		return err
 	}
 
-	return bot.clearLabel(e)
+	merr := utils.NewMultiErrors()
+	if err := bot.clearLabel(e); err != nil {
+		merr.AddError(err)
+	}
+
+	if err := bot.mergePRByLabelChanged(e, cfg, log); err != nil {
+		merr.AddError(err)
+	}
+
+	return merr.Err()
 }
 
 func (bot *robot) handleNoteEvent(e *sdk.NoteEvent, pc libconfig.PluginConfig, log *logrus.Entry) error {
@@ -79,6 +92,10 @@ func (bot *robot) handleNoteEvent(e *sdk.NoteEvent, pc libconfig.PluginConfig, l
 	}
 
 	if err = bot.handleApprove(e, cfg, log); err != nil {
+		merr.AddError(err)
+	}
+
+	if err = bot.handleCheckPR(e, cfg, log); err != nil {
 		merr.AddError(err)
 	}
 

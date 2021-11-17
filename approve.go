@@ -9,9 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	approvedLabel = "approved"
-)
+const approvedLabel = "approved"
 
 var (
 	regAddApprove    = regexp.MustCompile(`(?mi)^/approve\s*$`)
@@ -37,37 +35,37 @@ func (bot *robot) handleApprove(e *sdk.NoteEvent, cfg *botConfig, log *logrus.En
 }
 
 func (bot *robot) AddApprove(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
-	prInfo := e.GetPRInfo()
+	pr := e.GetPRInfo()
 	commenter := e.GetCommenter()
 
-	v, err := bot.hasPermission(commenter, prInfo, cfg, log)
+	v, err := bot.hasPermission(commenter, pr, cfg, log)
 	if err != nil {
 		return err
 	}
 
 	if !v {
-		return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, fmt.Sprintf(
+		return bot.cli.CreatePRComment(pr.Org, pr.Repo, pr.Number, fmt.Sprintf(
 			commentNoPermissionForLabel, commenter, "add", approvedLabel,
 		))
 	}
 
-	return bot.cli.AddPRLabel(prInfo.Org, prInfo.Repo, prInfo.Number, approvedLabel)
+	return bot.cli.AddPRLabel(pr.Org, pr.Repo, pr.Number, approvedLabel)
 }
 
 func (bot *robot) removeApprove(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
-	prInfo := e.GetPRInfo()
+	pr := e.GetPRInfo()
 	commenter := e.GetCommenter()
 
-	v, err := bot.hasPermission(commenter, prInfo, cfg, log)
+	v, err := bot.hasPermission(commenter, pr, cfg, log)
 	if err != nil {
 		return err
 	}
 
 	if !v {
-		return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, fmt.Sprintf(
+		return bot.cli.CreatePRComment(pr.Org, pr.Repo, pr.Number, fmt.Sprintf(
 			commentNoPermissionForLabel, commenter, "remove", approvedLabel,
 		))
 	}
 
-	return bot.cli.RemovePRLabel(prInfo.Org, prInfo.Repo, prInfo.Number, approvedLabel)
+	return bot.cli.RemovePRLabel(pr.Org, pr.Repo, pr.Number, approvedLabel)
 }

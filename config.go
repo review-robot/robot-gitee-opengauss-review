@@ -1,17 +1,6 @@
 package main
 
-import (
-	"fmt"
-
-	libconfig "github.com/opensourceways/community-robot-lib/config"
-)
-
-type pullRequestMergeType string
-
-const (
-	mergeMerge  pullRequestMergeType = "merge"
-	mergeSquash pullRequestMergeType = "squash"
-)
+import libconfig "github.com/opensourceways/community-robot-lib/config"
 
 type configuration struct {
 	ConfigItems []botConfig `json:"config_items,omitempty"`
@@ -32,7 +21,6 @@ func (c *configuration) configFor(org, repo string) *botConfig {
 	if i := libconfig.FindConfig(org, repo, v); i >= 0 {
 		return &items[i]
 	}
-
 	return nil
 }
 
@@ -74,32 +62,14 @@ type botConfig struct {
 	// besed on the owners file in sig directory when the developer comment /lgtm or /approve
 	// command. The format is 'org/repo'.
 	ReposOfSig []string `json:"repos_of_sig,omitempty"`
-
-	// RequiringLabels only PRs that already have these tags can be merged
-	RequiringLabels []string `json:"requiring_labels,omitempty"`
-
-	// MissingLabels PRs that already have these tags cannot be merged
-	MissingLabels []string `json:"missing_labels,omitempty"`
-
-	// MergeMethod is the method to merge PR.
-	// The default method of merge. Valid options are squash and merge.
-	MergeMethod pullRequestMergeType `json:"merge_method,omitempty"`
 }
 
 func (c *botConfig) setDefault() {
 	if c.LgtmCountsRequired == 0 {
 		c.LgtmCountsRequired = 1
 	}
-
-	if c.MergeMethod == "" {
-		c.MergeMethod = mergeMerge
-	}
 }
 
 func (c *botConfig) validate() error {
-	if c.MergeMethod != mergeMerge && c.MergeMethod != mergeSquash {
-		return fmt.Errorf("unsupported merge method:%s", c.MergeMethod)
-	}
-
 	return c.PluginForRepo.Validate()
 }

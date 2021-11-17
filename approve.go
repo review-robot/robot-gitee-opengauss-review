@@ -4,17 +4,13 @@ import (
 	"fmt"
 	"regexp"
 
-	libconfig "github.com/opensourceways/community-robot-lib/config"
+	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/opensourceways/community-robot-lib/giteeclient"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	approvedLabel           = "approved"
-	approvedAddedMsg        = `***approved*** is added in this pull request by: ***%s***. :wave: `
-	approvedNoPermissionMsg = `***%s*** has no permission to %s ***approved*** in this pull request. :astonished:
-please contact to the collaborators in this repository.`
-	approvedRemovedMsg = `***approved*** is removed in this pull request by: ***%s***. :flushed: `
+	approvedLabel = "approved"
 )
 
 var (
@@ -22,26 +18,25 @@ var (
 	regRemoveApprove = regexp.MustCompile(`(?mi)^/approve cancel\s*$`)
 )
 
-func (bot *robot) handleApprove(e giteeclient.PRNoteEvent, pc libconfig.PluginConfig, log *logrus.Entry) error {
-	org, repo := e.GetOrgRep()
+func (bot *robot) handleApprove(e *sdk.NoteEvent, cfg *botConfig, log *logrus.Entry) error {
+	ne := giteeclient.NewPRNoteEvent(e)
 
-	cfg, err := bot.getConfig(pc, org, repo)
-	if err != nil {
-		return err
+	if !ne.IsPullRequest() || !ne.IsPROpen() || !ne.IsCreatingCommentEvent() {
+		return nil
 	}
 
-	if regAddApprove.MatchString(e.GetComment()) {
-		return bot.execAddApproveCommand(cfg, e, log)
+	if regAddApprove.MatchString(ne.GetComment()) {
+		return bot.AddApprove(cfg, ne, log)
 	}
 
-	if regRemoveApprove.MatchString(e.GetComment()) {
-		return bot.execRemoveApproveCommand(cfg, e, log)
+	if regRemoveApprove.MatchString(ne.GetComment()) {
+		return bot.removeApprove(cfg, ne, log)
 	}
 
 	return nil
 }
 
-func (bot *robot) execAddApproveCommand(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
+func (bot *robot) AddApprove(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
 	prInfo := e.GetPRInfo()
 	commenter := e.GetCommenter()
 
@@ -51,24 +46,15 @@ func (bot *robot) execAddApproveCommand(cfg *botConfig, e giteeclient.PRNoteEven
 	}
 
 	if !v {
-		comment := fmt.Sprintf(approvedNoPermissionMsg, commenter, "add")
-
-		return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, comment)
+		return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, fmt.Sprintf(
+			commentNoPermissionForLabel, commenter, "add", approvedLabel,
+		))
 	}
 
-	if err := bot.cli.AddPRLabel(prInfo.Org, prInfo.Repo, prInfo.Number, approvedLabel); err != nil {
-		return err
-	}
-
-	err = bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, fmt.Sprintf(approvedAddedMsg, commenter))
-	if err != nil {
-		log.Error(err)
-	}
-
-	return bot.tryMergePR(e, true, cfg, log)
+	return bot.cli.AddPRLabel(prInfo.Org, prInfo.Repo, prInfo.Number, approvedLabel)
 }
 
-func (bot *robot) execRemoveApproveCommand(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
+func (bot *robot) removeApprove(cfg *botConfig, e giteeclient.PRNoteEvent, log *logrus.Entry) error {
 	prInfo := e.GetPRInfo()
 	commenter := e.GetCommenter()
 
@@ -78,14 +64,10 @@ func (bot *robot) execRemoveApproveCommand(cfg *botConfig, e giteeclient.PRNoteE
 	}
 
 	if !v {
-		comment := fmt.Sprintf(approvedNoPermissionMsg, commenter, "remove")
-
-		return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, comment)
+		return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, fmt.Sprintf(
+			commentNoPermissionForLabel, commenter, "remove", approvedLabel,
+		))
 	}
 
-	if err := bot.cli.RemovePRLabel(prInfo.Org, prInfo.Repo, prInfo.Number, approvedLabel); err != nil {
-		return err
-	}
-
-	return bot.cli.CreatePRComment(prInfo.Org, prInfo.Repo, prInfo.Number, fmt.Sprintf(approvedRemovedMsg, commenter))
+	return bot.cli.RemovePRLabel(prInfo.Org, prInfo.Repo, prInfo.Number, approvedLabel)
 }

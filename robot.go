@@ -23,20 +23,10 @@ type iClient interface {
 	GetPullRequestChanges(org, repo string, number int32) ([]sdk.PullRequestFiles, error)
 	CreateRepoLabel(org, repo, label, color string) error
 	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
-	ListPRComments(org, repo string, number int32) ([]sdk.PullRequestComments, error)
-	GetPRCommit(org, repo, SHA string) (sdk.RepoCommit, error)
-	GetGiteePullRequest(org, repo string, number int32) (sdk.PullRequest, error)
-	MergePR(owner, repo string, number int32, opt sdk.PullRequestMergePutParam) error
-	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
 }
 
 func newRobot(cli iClient, cacheCli *cache.SDK) *robot {
 	return &robot{cli: cli, cacheCli: cacheCli}
-}
-
-type ownersFile struct {
-	Maintainers []string `yaml:"maintainers"`
-	Committers  []string `yaml:"committers"`
 }
 
 type robot struct {
@@ -82,5 +72,9 @@ func (bot *robot) handleNoteEvent(e *sdk.NoteEvent, pc libconfig.PluginConfig, l
 		return err
 	}
 
-	return bot.handleLGTM(e, cfg, log)
+	if err := bot.handleLGTM(e, cfg, log); err != nil {
+		log.WithError(err).Error("handle lgtm command")
+	}
+
+	return bot.handleApprove(e, cfg, log)
 }

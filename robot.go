@@ -72,5 +72,9 @@ func (bot *robot) handleNoteEvent(e *sdk.NoteEvent, pc libconfig.PluginConfig, l
 		return err
 	}
 
-	return bot.handleLGTM(e, cfg, log)
+	if err := bot.handleLGTM(e, cfg, log); err != nil {
+		log.WithError(err).Error("handle lgtm command")
+	}
+
+	return bot.handleApprove(e, cfg, log)
 }

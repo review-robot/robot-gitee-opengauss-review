@@ -20,9 +20,9 @@
 
   [配置项](#configuration)提供了PR `lgtm`标签的个数设置，当该配置项大于1时，`lgtm`标签的内容以`lgtm-user`组成。ps： user为使用/lgtm命令的用户在码云平台的login id。
 
-- **自动清理lgtm、approved标签**
+- **自动清理lgtm标签**
 
-  当PR有新的commit提交时我们将会检查`lgtm`、`approve`是否已过时并自动移除已过时的标签。
+  当PR有新的commit提交时我们将会移除已存在的`lgtm`标签。
 
 - **PR合入**
 
@@ -42,14 +42,13 @@ config_items:
     excluded_repos: #robot 管理列表中需排除的仓库
      - owner1/repo1
     lgtm_counts_required: 1 #lgtm标签阈值
-    requiring_labels: #PR合入需要的标签
+    labels_for_merge: #PR合入需要的标签
       - ci-pipline-success
-     missing_labels: #PR合入时不能存在的标签
+     missing_labels_for_merge: #PR合入时不能存在的标签
       - ci-pipline-failed
-     special_repo: #指定需额外根据sig组配置检查指令使用者权限的仓库
+     repos_of_sig: #指定需额外根据sig组配置检查指令使用者权限的仓库
        - community
        - TC
-     close_store_sha: false #是否缓存最新的commit sha
      merge_method: merge #PR合入时使用的方式，可选项：merge、squash.默认merge.
 ```
 

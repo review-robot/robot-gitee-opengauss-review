@@ -20,9 +20,9 @@ The bot provides Code Review-related functionality for the openGauss community. 
 
   The [configuration item](#configuration) provides a setting for the number of PR `lgtm` tags. When this configuration item is greater than 1, the contents of the `lgtm` tags consist of `lgtm-user`. ps：the `user` is the login id of the user using /lgtm command in the gitee platform.
 
-- **Automatic cleaning of lgtm, approved labels**
+- **Automatic cleaning of lgtm labels**
 
-  When PR has new commits we will check if `lgtm`, `approve` are out of date and remove the out of date tags automatically.
+  We will remove the existing `lgtm` labels when a new commit is submitted for the PR.
 
 - **Merge PR**
 
@@ -42,18 +42,16 @@ config_items:
     excluded_repos: #robot manages the list of repositories to be excluded
      - owner1/repo1
     lgtm_counts_required: 1 #lgtm label threshold
-    requiring_labels: #labels required for PR merging
+    labels_for_merge: #labels required for PR merging
       - ci-pipline-success
-     missing_labels: #labels that cannot exist when PR is merged in
+    missing_labels_for_merge: #labels that cannot exist when PR is merged in
       - ci-pipline-failed
      #specify the repository that needs to additionally check the user rights of the command against the sig group configuration
-     special_repo: 
-       - community
-       - TC
-     close_store_sha: false # whether to cache the latest commit sha.
-     
-     # merge_method is the method to merge PR.The default method of merge. valid options are squash and merge.
-     merge_method: merge
+    repos_of_sig: 
+      - community
+      - TC
+    # merge_method is the method to merge PR.The default method of merge. valid options are squash and merge.
+    merge_method: merge
 ```
 
 

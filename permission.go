@@ -32,16 +32,12 @@ func (bot *robot) hasPermission(
 		return true, nil
 	}
 
-	v, err := bot.getRepoOwners(pr, log)
-	if err != nil {
-		return false, err
-	}
-	if v.Has(commenter) {
+	if bot.isRepoOwners(commenter, pr, log) {
 		return true, nil
 	}
 
 	if len(cfg.ReposOfSig) > 0 {
-		v = sets.NewString(cfg.ReposOfSig...)
+		v := sets.NewString(cfg.ReposOfSig...)
 		if v.Has(fmt.Sprintf("%s/%s", pr.Org, pr.Repo)) {
 			return bot.isOwnerOfSig(commenter, pr, cfg, log)
 		}
@@ -50,13 +46,22 @@ func (bot *robot) hasPermission(
 	return false, nil
 }
 
-func (bot *robot) getRepoOwners(pr giteeclient.PRInfo, log *logrus.Entry) (sets.String, error) {
+func (bot *robot) isRepoOwners(
+	commenter string,
+	pr giteeclient.PRInfo,
+	log *logrus.Entry,
+) bool {
 	v, err := bot.cli.GetPathContent(pr.Org, pr.Repo, ownerFile, pr.BaseRef)
-	if err != nil || v.Content == "" {
-		return nil, err
+	if err != nil {
+		log.Errorf(
+			"get file:%s/%s/%s:%s, err:%s",
+			pr.Org, pr.Repo, pr.BaseRef, ownerFile, err.Error(),
+		)
+		return false
 	}
 
-	return decodeOwnerFile(v.Content, log), nil
+	o := decodeOwnerFile(v.Content, log)
+	return o.Has(commenter)
 }
 
 func (bot *robot) isOwnerOfSig(

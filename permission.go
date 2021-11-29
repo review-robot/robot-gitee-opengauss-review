@@ -32,11 +32,7 @@ func (bot *robot) hasPermission(
 		return true, nil
 	}
 
-	v, err := bot.getRepoOwners(pr, log)
-	if err != nil {
-		return false, err
-	}
-	if v.Has(commenter) {
+	if bot.isRepoOwners(commenter, pr, log) {
 		return true, nil
 	}
 
@@ -50,13 +46,22 @@ func (bot *robot) hasPermission(
 	return false, nil
 }
 
-func (bot *robot) getRepoOwners(pr giteeclient.PRInfo, log *logrus.Entry) (sets.String, error) {
+func (bot *robot) isRepoOwners(
+	commenter string,
+	pr giteeclient.PRInfo,
+	log *logrus.Entry,
+) bool {
 	v, err := bot.cli.GetPathContent(pr.Org, pr.Repo, ownerFile, pr.BaseRef)
-	if err != nil || v.Content == "" {
-		return nil, err
+	if err != nil {
+		log.Errorf(
+			"get file:%s/%s/%s:%s, err:%s",
+			pr.Org, pr.Repo, pr.BaseRef, ownerFile, err.Error(),
+		)
+		return false
 	}
 
-	return decodeOwnerFile(v.Content, log), nil
+	v := decodeOwnerFile(v.Content, log)
+	return v.Has(commenter)
 }
 
 func (bot *robot) isOwnerOfSig(

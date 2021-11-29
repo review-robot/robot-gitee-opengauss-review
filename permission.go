@@ -37,7 +37,7 @@ func (bot *robot) hasPermission(
 	}
 
 	if len(cfg.ReposOfSig) > 0 {
-		v = sets.NewString(cfg.ReposOfSig...)
+		v := sets.NewString(cfg.ReposOfSig...)
 		if v.Has(fmt.Sprintf("%s/%s", pr.Org, pr.Repo)) {
 			return bot.isOwnerOfSig(commenter, pr, cfg, log)
 		}
@@ -60,8 +60,8 @@ func (bot *robot) isRepoOwners(
 		return false
 	}
 
-	v := decodeOwnerFile(v.Content, log)
-	return v.Has(commenter)
+	o := decodeOwnerFile(v.Content, log)
+	return o.Has(commenter)
 }
 
 func (bot *robot) isOwnerOfSig(

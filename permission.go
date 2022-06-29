@@ -111,7 +111,7 @@ func (bot *robot) getSigOwnerFiles(org, repo, branch string, log *logrus.Entry) 
 			Repo:     repo,
 			Branch:   branch,
 		},
-		ownerFile, true,
+		ownerFile, false,
 	)
 	if err != nil {
 		return models.FilesInfo{}, err

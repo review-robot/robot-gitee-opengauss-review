@@ -36,7 +36,7 @@ func (bot *robot) handleCheckPR(e *sdk.NoteEvent, cfg *botConfig) error {
 		return bot.cli.CreatePRComment(
 			org, repo, ne.GetPRNumber(),
 			fmt.Sprintf(
-				"@%s, this pr is not mergeable and the reasons are below:\n%s",
+				"@%s , this pr is not mergeable and the reasons are below:\n%s",
 				ne.GetCommenter(), strings.Join(r, "\n"),
 			),
 		)
@@ -97,7 +97,7 @@ func canMerge(mergeable bool, labels sets.String, cfg *botConfig) []string {
 	needs.Insert(cfg.LabelsForMerge...)
 
 	if ln := cfg.LgtmCountsRequired; ln == 1 {
-		needs = sets.NewString(lgtmLabel)
+		needs.Insert(lgtmLabel)
 	} else {
 		v := getLGTMLabelsOnPR(labels)
 		if n := uint(len(v)); n < ln {
